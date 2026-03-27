@@ -1,0 +1,82 @@
+{
+  "name": "jira-task-converter",
+  "version": "1.0.0",
+  "description": "Convert DOCX documents to Jira tasks using local AI",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "build:electron": "tsc",
+    "build:renderer": "webpack --mode production",
+    "build": "npm run build:electron && npm run build:renderer",
+    "watch:electron": "tsc --watch",
+    "watch:renderer": "webpack --mode development --watch",
+    "dev": "concurrently \"npm run watch:electron\" \"npm run watch:renderer\" \"wait-on dist-electron/main.js dist/bundle.js && electron .\"",
+    "start": "npm run build && electron .",
+    "electron": "electron .",
+    "dist": "npm run build && electron-builder",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.jirataskconverter.app",
+    "productName": "Jira Task Converter",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist-electron/**/*",
+      "dist/**/*",
+      "src/index.html",
+      "src/styles/**/*",
+      "node_modules/**/*",
+      "!node_modules/.cache"
+    ],
+    "asarUnpack": [
+      "node_modules/node-llama-cpp/**/*",
+      "node_modules/@node-llama-cpp/**/*"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ]
+    }
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "electron-store": "^8.2.0",
+    "form-data": "^4.0.5",
+    "mammoth": "^1.8.0",
+    "node-llama-cpp": "^3.18.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/form-data": "^2.2.1",
+    "@types/node": "^20.19.37",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "concurrently": "^8.2.2",
+    "css-loader": "^7.1.2",
+    "electron": "^31.0.0",
+    "electron-builder": "^26.8.1",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.3",
+    "wait-on": "^7.2.0",
+    "webpack": "^5.92.1",
+    "webpack-cli": "^5.1.4"
+  }
+}
