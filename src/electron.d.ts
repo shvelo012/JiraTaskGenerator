@@ -7,6 +7,7 @@ import type {
   SaveSettingsResult,
   ModelState,
   ModelDownloadProgress,
+  ModelConfig,
   CurrentSession,
   HistoryEntry,
 } from './types';
@@ -24,12 +25,13 @@ declare global {
       saveSettings: (settings: AppSettings) => Promise<SaveSettingsResult>;
 
       // Model management
+      getModels: () => Promise<Array<ModelConfig & { downloaded: boolean }>>;
       getModelStatus: () => Promise<ModelState>;
-      downloadModel: () => Promise<{ success: boolean; error?: string }>;
-      cancelDownload: () => Promise<{ success: boolean }>;
-      loadModel: () => Promise<{ success: boolean; error?: string }>;
-      onModelDownloadProgress: (callback: (progress: ModelDownloadProgress) => void) => void;
-      onModelStatusChanged: (callback: (status: ModelState) => void) => void;
+      downloadModel: (modelId: string) => Promise<{ success: boolean; error?: string }>;
+      cancelDownload: (modelId: string) => Promise<{ success: boolean }>;
+      loadModel: (modelId: string) => Promise<{ success: boolean; error?: string }>;
+      onModelDownloadProgress: (callback: (progress: ModelDownloadProgress & { modelId: string }) => void) => void;
+      onModelStatusChanged: (callback: (status: ModelState & { modelId: string }) => void) => void;
       removeModelListeners: () => void;
 
       // Session persistence

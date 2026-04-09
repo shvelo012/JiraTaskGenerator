@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import type { AppSettings, ModelState } from '../types';
+import type { AppSettings, ModelConfig, ModelState } from '../types';
 
 interface StatusMsg {
   type: 'loading' | 'success' | 'error';
   msg: string;
 }
+
+interface ModelEntry extends ModelConfig {
+  downloaded: boolean;
+}
+
+type PerModelState = Record<string, ModelState>;
 
 interface Props {
   onClose?: () => void;
@@ -25,30 +31,53 @@ export default function Settings({ onClose }: Props) {
     jiraApiToken: '',
     jiraProjectKey: '',
     storyPointsField: 'story_points',
+    selectedModelId: '',
   });
   const [status, setStatus] = useState<StatusMsg | null>(null);
   const [loading, setLoading] = useState(true);
-  const [modelState, setModelState] = useState<ModelState>({ state: 'not-downloaded' });
+  const [models, setModels] = useState<ModelEntry[]>([]);
+  const [modelStates, setModelStates] = useState<PerModelState>({});
 
   useEffect(() => {
-    window.electronAPI.getSettings().then((s) => {
+    const init = async () => {
+      const [s, modelList] = await Promise.all([
+        window.electronAPI.getSettings(),
+        window.electronAPI.getModels(),
+      ]);
       setForm({
         jiraBaseUrl: s.jiraBaseUrl ?? '',
         jiraEmail: s.jiraEmail ?? '',
         jiraApiToken: s.jiraApiToken ?? '',
         jiraProjectKey: s.jiraProjectKey ?? '',
         storyPointsField: s.storyPointsField ?? 'story_points',
+        selectedModelId: s.selectedModelId ?? '',
       });
-      setLoading(false);
-    });
+      setModels(modelList);
 
-    window.electronAPI.getModelStatus().then(setModelState);
+      // Build initial per-model states from download flags
+      const initial: PerModelState = {};
+      for (const m of modelList) {
+        initial[m.id] = { state: m.downloaded ? 'downloaded' : 'not-downloaded' };
+      }
+      setModelStates(initial);
+
+      setLoading(false);
+    };
+    init();
 
     window.electronAPI.onModelDownloadProgress((progress) => {
-      setModelState({ state: 'downloading', ...progress });
+      setModelStates((prev) => ({
+        ...prev,
+        [progress.modelId]: { state: 'downloading', downloaded: progress.downloaded, total: progress.total, percent: progress.percent },
+      }));
     });
 
-    window.electronAPI.onModelStatusChanged(setModelState);
+    window.electronAPI.onModelStatusChanged((status) => {
+      setModelStates((prev) => ({
+        ...prev,
+        [status.modelId]: status,
+      }));
+    });
 
     return () => {
       window.electronAPI.removeModelListeners();
@@ -80,17 +109,24 @@ export default function Settings({ onClose }: Props) {
     }
   };
 
-  const handleDownload = async () => {
-    setModelState({ state: 'downloading', downloaded: 0, total: 0, percent: 0 });
-    await window.electronAPI.downloadModel();
+  const handleDownload = async (modelId: string) => {
+    setModelStates((prev) => ({
+      ...prev,
+      [modelId]: { state: 'downloading', downloaded: 0, total: 0, percent: 0 },
+    }));
+    await window.electronAPI.downloadModel(modelId);
   };
 
-  const handleCancel = async () => {
-    await window.electronAPI.cancelDownload();
+  const handleCancel = async (modelId: string) => {
+    await window.electronAPI.cancelDownload(modelId);
   };
 
-  const handleLoadModel = async () => {
-    await window.electronAPI.loadModel();
+  const handleLoadModel = async (modelId: string) => {
+    await window.electronAPI.loadModel(modelId);
+  };
+
+  const handleSelectModel = (modelId: string) => {
+    handleChange('selectedModelId', modelId);
   };
 
   if (loading) {
@@ -108,75 +144,123 @@ export default function Settings({ onClose }: Props) {
       <div className="card" style={{ marginBottom: 16 }}>
         <p className="settings-section-title">Local AI Model</p>
         <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>
-          Llama 3.2 3B Instruct — runs entirely on your machine, no API key needed (~2 GB download)
+          Choose a model to run entirely on your machine — no API key needed.
+          Select an active model after downloading it.
         </p>
 
-        {modelState.state === 'not-downloaded' && (
-          <div>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
-              Model not downloaded yet.
-            </p>
-            <button className="btn btn-primary" onClick={handleDownload}>
-              Download Model
-            </button>
-          </div>
-        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {models.map((model) => {
+            const ms = modelStates[model.id] ?? { state: 'not-downloaded' };
+            const isSelected = form.selectedModelId === model.id;
 
-        {modelState.state === 'downloading' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6, color: 'var(--text-muted)' }}>
-              <span>Downloading…</span>
-              <span>
-                {formatBytes(modelState.downloaded)} / {modelState.total > 0 ? formatBytes(modelState.total) : '?'} ({modelState.percent}%)
-              </span>
-            </div>
-            <div style={{ background: 'var(--bg-tertiary)', borderRadius: 4, height: 8, overflow: 'hidden', marginBottom: 10 }}>
+            return (
               <div
+                key={model.id}
                 style={{
-                  height: '100%',
-                  width: `${modelState.percent}%`,
-                  background: 'var(--accent)',
-                  transition: 'width 0.3s ease',
-                  borderRadius: 4,
+                  border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
+                  borderRadius: 8,
+                  padding: '12px 14px',
+                  background: isSelected ? 'rgba(99,102,241,0.07)' : 'var(--bg-tertiary)',
                 }}
-              />
-            </div>
-            <button className="btn btn-secondary" onClick={handleCancel}>
-              Cancel
-            </button>
-          </div>
-        )}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
+                      {model.name}
+                      {isSelected && (
+                        <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--accent-light)', fontWeight: 400 }}>
+                          ● Active
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{model.description}</div>
+                  </div>
 
-        {modelState.state === 'downloaded' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ color: 'var(--success)', fontSize: 13 }}>&#10003; Model downloaded</span>
-            <button className="btn btn-secondary btn-sm" onClick={handleLoadModel}>
-              Load into memory
-            </button>
-          </div>
-        )}
+                  {!isSelected && ms.state === 'downloaded' && (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      style={{ flexShrink: 0 }}
+                      onClick={() => handleSelectModel(model.id)}
+                    >
+                      Use this model
+                    </button>
+                  )}
+                  {!isSelected && ms.state === 'ready' && (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      style={{ flexShrink: 0 }}
+                      onClick={() => handleSelectModel(model.id)}
+                    >
+                      Use this model
+                    </button>
+                  )}
+                </div>
 
-        {modelState.state === 'loading' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div className="spinner" />
-            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Loading model into memory…</span>
-          </div>
-        )}
+                {ms.state === 'not-downloaded' && (
+                  <button className="btn btn-primary btn-sm" onClick={() => handleDownload(model.id)}>
+                    Download
+                  </button>
+                )}
 
-        {modelState.state === 'ready' && (
-          <span style={{ color: 'var(--success)', fontSize: 13 }}>&#10003; Model loaded and ready</span>
-        )}
+                {ms.state === 'downloading' && (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6, color: 'var(--text-muted)' }}>
+                      <span>Downloading…</span>
+                      <span>
+                        {formatBytes(ms.downloaded)} / {ms.total > 0 ? formatBytes(ms.total) : '?'} ({ms.percent}%)
+                      </span>
+                    </div>
+                    <div style={{ background: 'var(--bg-secondary)', borderRadius: 4, height: 6, overflow: 'hidden', marginBottom: 8 }}>
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${ms.percent}%`,
+                          background: 'var(--accent)',
+                          transition: 'width 0.3s ease',
+                          borderRadius: 4,
+                        }}
+                      />
+                    </div>
+                    <button className="btn btn-secondary btn-sm" onClick={() => handleCancel(model.id)}>
+                      Cancel
+                    </button>
+                  </div>
+                )}
 
-        {modelState.state === 'error' && (
-          <div>
-            <p style={{ color: 'var(--error)', fontSize: 12, marginBottom: 8 }}>
-              Error: {modelState.message}
-            </p>
-            <button className="btn btn-primary" onClick={handleDownload}>
-              Retry Download
-            </button>
-          </div>
-        )}
+                {ms.state === 'downloaded' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ color: 'var(--success)', fontSize: 12 }}>&#10003; Downloaded</span>
+                    <button className="btn btn-secondary btn-sm" onClick={() => handleLoadModel(model.id)}>
+                      Load into memory
+                    </button>
+                  </div>
+                )}
+
+                {ms.state === 'loading' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div className="spinner" />
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Loading into memory…</span>
+                  </div>
+                )}
+
+                {ms.state === 'ready' && (
+                  <span style={{ color: 'var(--success)', fontSize: 12 }}>&#10003; Loaded and ready</span>
+                )}
+
+                {ms.state === 'error' && (
+                  <div>
+                    <p style={{ color: 'var(--error)', fontSize: 12, marginBottom: 6 }}>
+                      Error: {ms.message}
+                    </p>
+                    <button className="btn btn-primary btn-sm" onClick={() => handleDownload(model.id)}>
+                      Retry Download
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Jira Section */}

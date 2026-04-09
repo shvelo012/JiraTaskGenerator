@@ -8,12 +8,13 @@ import Store from 'electron-store';
 import type { IpcMain, BrowserWindow } from 'electron';
 import type { AppSettings, JiraTask, CurrentSession, HistoryEntry } from '../src/types';
 import {
+  MODELS,
+  DEFAULT_MODEL_ID,
   isModelDownloaded,
   downloadModel,
   cancelDownload,
   loadModel,
   generateTasks as llamaGenerateTasks,
-  getModelPath,
 } from './llm-manager';
 
 interface StoreSchema extends AppSettings {}
@@ -30,6 +31,7 @@ const store = new Store<StoreSchema>({
     jiraApiToken: '',
     jiraProjectKey: '',
     storyPointsField: 'story_points',
+    selectedModelId: DEFAULT_MODEL_ID,
   },
 });
 
@@ -112,55 +114,65 @@ export function registerIpcHandlers(ipcMain: IpcMain, getWindow: () => BrowserWi
   // ── Generate Tasks via local LLM ────────────────────────────────────────────
   ipcMain.handle('generate-tasks', async (_event, text: string) => {
     try {
-      if (!isModelDownloaded()) {
-        throw new Error('Model not downloaded yet. Please download it in Settings first.');
+      const modelId = store.get('selectedModelId') || DEFAULT_MODEL_ID;
+      if (!isModelDownloaded(modelId)) {
+        throw new Error('Selected model is not downloaded yet. Please download it in Settings first.');
       }
-      const tasks = await llamaGenerateTasks(text);
+      const tasks = await llamaGenerateTasks(text, modelId);
       return { success: true, tasks };
     } catch (err) {
       return { success: false, error: (err as Error).message };
     }
   });
 
-  // ── Model Status ────────────────────────────────────────────────────────────
+  // ── Get All Models (with per-model download state) ──────────────────────────
+  ipcMain.handle('get-models', async () => {
+    return MODELS.map((m) => ({
+      ...m,
+      downloaded: isModelDownloaded(m.id),
+    }));
+  });
+
+  // ── Model Status (for active/selected model) ────────────────────────────────
   ipcMain.handle('get-model-status', async () => {
-    if (!isModelDownloaded()) return { state: 'not-downloaded' };
+    const modelId = store.get('selectedModelId') || DEFAULT_MODEL_ID;
+    if (!isModelDownloaded(modelId)) return { state: 'not-downloaded' };
     return { state: 'downloaded' };
   });
 
   // ── Download Model ──────────────────────────────────────────────────────────
-  ipcMain.handle('download-model', async () => {
+  ipcMain.handle('download-model', async (_event, modelId: string) => {
     try {
       const win = getWindow();
-      await downloadModel((downloaded, total, percent) => {
-        win?.webContents.send('model-download-progress', { downloaded, total, percent });
+      await downloadModel(modelId, (downloaded, total, percent) => {
+        win?.webContents.send('model-download-progress', { modelId, downloaded, total, percent });
       });
-      getWindow()?.webContents.send('model-status-changed', { state: 'downloaded' });
+      getWindow()?.webContents.send('model-status-changed', { modelId, state: 'downloaded' });
       return { success: true };
     } catch (err) {
       const message = (err as Error).message;
-      getWindow()?.webContents.send('model-status-changed', { state: 'error', message });
+      getWindow()?.webContents.send('model-status-changed', { modelId, state: 'error', message });
       return { success: false, error: message };
     }
   });
 
   // ── Cancel Download ─────────────────────────────────────────────────────────
-  ipcMain.handle('cancel-download', async () => {
+  ipcMain.handle('cancel-download', async (_event, modelId: string) => {
     cancelDownload();
-    getWindow()?.webContents.send('model-status-changed', { state: 'not-downloaded' });
+    getWindow()?.webContents.send('model-status-changed', { modelId, state: 'not-downloaded' });
     return { success: true };
   });
 
   // ── Load Model ──────────────────────────────────────────────────────────────
-  ipcMain.handle('load-model', async () => {
+  ipcMain.handle('load-model', async (_event, modelId: string) => {
     try {
-      getWindow()?.webContents.send('model-status-changed', { state: 'loading' });
-      await loadModel();
-      getWindow()?.webContents.send('model-status-changed', { state: 'ready' });
+      getWindow()?.webContents.send('model-status-changed', { modelId, state: 'loading' });
+      await loadModel(modelId);
+      getWindow()?.webContents.send('model-status-changed', { modelId, state: 'ready' });
       return { success: true };
     } catch (err) {
       const message = (err as Error).message;
-      getWindow()?.webContents.send('model-status-changed', { state: 'error', message });
+      getWindow()?.webContents.send('model-status-changed', { modelId, state: 'error', message });
       return { success: false, error: message };
     }
   });
@@ -391,6 +403,7 @@ export function registerIpcHandlers(ipcMain: IpcMain, getWindow: () => BrowserWi
     jiraApiToken: store.get('jiraApiToken'),
     jiraProjectKey: store.get('jiraProjectKey'),
     storyPointsField: store.get('storyPointsField'),
+    selectedModelId: store.get('selectedModelId') || DEFAULT_MODEL_ID,
   }));
 
   ipcMain.handle('save-settings', async (_event, settings: Partial<AppSettings>) => {
@@ -401,6 +414,7 @@ export function registerIpcHandlers(ipcMain: IpcMain, getWindow: () => BrowserWi
         'jiraApiToken',
         'jiraProjectKey',
         'storyPointsField',
+        'selectedModelId',
       ];
       for (const key of keys) {
         if (settings[key] !== undefined) {

@@ -134,7 +134,7 @@ export default function App() {
 
   const handleGenerateTasks = async () => {
     if (!docData?.text) return;
-    setAiStatus({ type: 'loading', msg: 'Generating tasks locally with Llama AI… This may take a moment.' });
+    setAiStatus({ type: 'loading', msg: 'Generating tasks with AI… This may take a moment.' });
     setTasks([]);
     setCreationResults(null);
 

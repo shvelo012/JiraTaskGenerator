@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { AppSettings, JiraTask, ModelDownloadProgress, ModelState, CurrentSession, HistoryEntry } from './src/types';
+import type { AppSettings, JiraTask, ModelDownloadProgress, ModelState, ModelConfig, CurrentSession, HistoryEntry } from './src/types';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   openFileDialog: (): Promise<string | null> =>
@@ -27,23 +27,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('save-settings', settings),
 
   // Model management
+  getModels: (): Promise<Array<ModelConfig & { downloaded: boolean }>> =>
+    ipcRenderer.invoke('get-models'),
+
   getModelStatus: (): Promise<ModelState> =>
     ipcRenderer.invoke('get-model-status'),
 
-  downloadModel: (): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke('download-model'),
+  downloadModel: (modelId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('download-model', modelId),
 
-  cancelDownload: (): Promise<{ success: boolean }> =>
-    ipcRenderer.invoke('cancel-download'),
+  cancelDownload: (modelId: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('cancel-download', modelId),
 
-  loadModel: (): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke('load-model'),
+  loadModel: (modelId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('load-model', modelId),
 
-  onModelDownloadProgress: (callback: (progress: ModelDownloadProgress) => void) => {
+  onModelDownloadProgress: (callback: (progress: ModelDownloadProgress & { modelId: string }) => void) => {
     ipcRenderer.on('model-download-progress', (_event, progress) => callback(progress));
   },
 
-  onModelStatusChanged: (callback: (status: ModelState) => void) => {
+  onModelStatusChanged: (callback: (status: ModelState & { modelId: string }) => void) => {
     ipcRenderer.on('model-status-changed', (_event, status) => callback(status));
   },
 

@@ -14,6 +14,15 @@ export interface AppSettings {
   jiraApiToken: string;
   jiraProjectKey: string;
   storyPointsField: string;
+  selectedModelId: string;
+}
+
+export interface ModelConfig {
+  id: string;
+  name: string;
+  description: string;
+  filename: string;
+  url: string;
 }
 
 export type ModelState =

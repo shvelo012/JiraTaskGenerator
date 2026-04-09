@@ -3,13 +3,28 @@ import * as path from 'path';
 import * as https from 'https';
 import { app } from 'electron';
 import type { IncomingMessage } from 'http';
-import type { JiraTask } from '../src/types';
+import type { JiraTask, ModelConfig } from '../src/types';
 
-// ── Constants ────────────────────────────────────────────────────────────────
+// ── Model Catalogue ───────────────────────────────────────────────────────────
 
-const MODEL_FILENAME = 'Llama-3.2-3B-Instruct-Q4_K_M.gguf';
-const MODEL_URL =
-  'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf';
+export const MODELS: ModelConfig[] = [
+  {
+    id: 'llama-3.2-3b',
+    name: 'Llama 3.2 3B Instruct',
+    description: 'Fast, English-focused model (~2 GB download)',
+    filename: 'Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+    url: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+  },
+  {
+    id: 'qwen2.5-3b',
+    name: 'Qwen 2.5 3B Instruct',
+    description: 'Multilingual model — Georgian, Russian, Arabic, CJK and more (~2 GB download)',
+    filename: 'Qwen2.5-3B-Instruct-Q4_K_M.gguf',
+    url: 'https://huggingface.co/bartowski/Qwen2.5-3B-Instruct-GGUF/resolve/main/Qwen2.5-3B-Instruct-Q4_K_M.gguf',
+  },
+];
+
+export const DEFAULT_MODEL_ID = MODELS[0].id;
 
 // ── ESM interop ───────────────────────────────────────────────────────────────
 // node-llama-cpp is ESM-only. TypeScript (module:commonjs) compiles import()
@@ -22,6 +37,7 @@ async function importLlamaCpp(): Promise<typeof import('node-llama-cpp')> {
 
 let llamaInstance: import('node-llama-cpp').Llama | null = null;
 let loadedModel: import('node-llama-cpp').LlamaModel | null = null;
+let loadedModelId: string | null = null;
 let activeDownload: IncomingMessage | null = null;
 
 // ── Paths ────────────────────────────────────────────────────────────────────
@@ -30,26 +46,36 @@ export function getModelsDir(): string {
   return path.join(app.getPath('userData'), 'models');
 }
 
-export function getModelPath(): string {
-  return path.join(getModelsDir(), MODEL_FILENAME);
+export function getModelPath(modelId: string): string {
+  const config = MODELS.find((m) => m.id === modelId);
+  if (!config) throw new Error(`Unknown model ID: ${modelId}`);
+  return path.join(getModelsDir(), config.filename);
 }
 
-export function isModelDownloaded(): boolean {
-  return fs.existsSync(getModelPath());
+export function isModelDownloaded(modelId: string): boolean {
+  try {
+    return fs.existsSync(getModelPath(modelId));
+  } catch {
+    return false;
+  }
 }
 
 // ── Download ─────────────────────────────────────────────────────────────────
 
 export function downloadModel(
+  modelId: string,
   onProgress: (downloaded: number, total: number, percent: number) => void,
 ): Promise<void> {
+  const config = MODELS.find((m) => m.id === modelId);
+  if (!config) return Promise.reject(new Error(`Unknown model ID: ${modelId}`));
+
   return new Promise((resolve, reject) => {
     const modelsDir = getModelsDir();
     if (!fs.existsSync(modelsDir)) {
       fs.mkdirSync(modelsDir, { recursive: true });
     }
 
-    const finalPath = getModelPath();
+    const finalPath = getModelPath(modelId);
     const partPath = `${finalPath}.part`;
 
     function doRequest(url: string): void {
@@ -102,7 +128,7 @@ export function downloadModel(
       });
     }
 
-    doRequest(MODEL_URL);
+    doRequest(config.url);
   });
 }
 
@@ -110,35 +136,49 @@ export function cancelDownload(): void {
   if (activeDownload) {
     activeDownload.destroy();
     activeDownload = null;
-    const partPath = `${getModelPath()}.part`;
-    fs.unlink(partPath, () => {});
+    // Clean up any partial files
+    for (const m of MODELS) {
+      try {
+        const partPath = `${getModelPath(m.id)}.part`;
+        if (fs.existsSync(partPath)) fs.unlink(partPath, () => {});
+      } catch {}
+    }
   }
 }
 
 // ── Load ─────────────────────────────────────────────────────────────────────
 
-export async function loadModel(): Promise<void> {
-  if (loadedModel) return;
+export async function loadModel(modelId: string): Promise<void> {
+  if (loadedModelId === modelId && loadedModel) return;
+
+  // Unload previous model if a different one is loaded
+  if (loadedModel && loadedModelId !== modelId) {
+    loadedModel = null;
+    llamaInstance = null;
+    loadedModelId = null;
+  }
 
   const { getLlama } = await importLlamaCpp();
 
   llamaInstance = await getLlama();
-  loadedModel = await llamaInstance.loadModel({ modelPath: getModelPath() });
+  loadedModel = await llamaInstance.loadModel({ modelPath: getModelPath(modelId) });
+  loadedModelId = modelId;
 }
 
 export function unloadModel(): void {
   loadedModel = null;
   llamaInstance = null;
+  loadedModelId = null;
 }
 
 // ── Inference ─────────────────────────────────────────────────────────────────
 
-export async function generateTasks(text: string): Promise<JiraTask[]> {
-  if (!isModelDownloaded()) {
+export async function generateTasks(text: string, modelId: string): Promise<JiraTask[]> {
+  if (!isModelDownloaded(modelId)) {
     throw new Error('Model not downloaded. Please download it in Settings first.');
   }
 
-  await loadModel();
+  await loadModel(modelId);
 
   const { LlamaChatSession } = await importLlamaCpp();
 
