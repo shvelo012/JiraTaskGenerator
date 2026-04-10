@@ -402,6 +402,7 @@ export default function App() {
         >
           &#9881; Settings
         </button>
+        <div className="sidebar-version">v1.3.0</div>
       </aside>
 
       {/* Main Content */}

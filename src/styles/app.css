@@ -239,6 +239,12 @@ html, body, #root {
   color: var(--accent-light);
   border-color: var(--accent);
 }
+.sidebar-version {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 8px 0 12px;
+}
 
 /* ── Main Content ─────────────────────────────────────────────────────────── */
 .main-content {
