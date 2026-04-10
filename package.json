@@ -2,7 +2,7 @@
   "name": "jira-task-converter",
   "version": "1.1.0",
   "description": "Convert DOCX documents to Jira tasks using local AI",
-  "homepage": "https://github.com/saba30/JiraTaksConverter",
+  "homepage": "https://github.com/shvelo012/JiraTaskGenerator",
   "author": {
     "name": "saba30",
     "email": "saba30@users.noreply.github.com"
@@ -64,8 +64,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "saba30",
-      "repo": "JiraTaksConverter"
+      "owner": "shvelo012",
+      "repo": "JiraTaskGenerator"
     }
   },
   "dependencies": {
