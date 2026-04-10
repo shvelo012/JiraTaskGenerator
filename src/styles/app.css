@@ -32,11 +32,70 @@ html, body, #root {
 }
 
 /* ── Layout ──────────────────────────────────────────────────────────────── */
-.app-layout {
+.app-root {
   display: flex;
+  flex-direction: column;
   height: 100vh;
   overflow: hidden;
 }
+
+.app-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Update Banner ───────────────────────────────────────────────────────── */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  flex-shrink: 0;
+  z-index: 100;
+}
+.update-banner--available  { background: #2a2a10; color: var(--warning); border-bottom: 1px solid #f59e0b44; }
+.update-banner--downloading { background: #1a1a30; color: var(--accent-light); border-bottom: 1px solid var(--border-accent); }
+.update-banner--ready      { background: #102210; color: var(--success); border-bottom: 1px solid #22c55e44; }
+.update-banner--error      { background: #2a1010; color: var(--error); border-bottom: 1px solid #ef444444; }
+
+.update-progress-bar {
+  flex: 1;
+  max-width: 200px;
+  height: 4px;
+  background: var(--bg-hover);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.update-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.update-install-btn {
+  padding: 4px 12px;
+  background: var(--success);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.update-install-btn:hover { background: #16a34a; }
+.update-dismiss-btn {
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.update-dismiss-btn:hover { color: var(--text-primary); border-color: var(--text-muted); }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────── */
 .sidebar {

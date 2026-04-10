@@ -71,4 +71,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   deleteHistoryEntry: (id: string) =>
     ipcRenderer.invoke('delete-history-entry', id),
+
+  // Auto-updater
+  onUpdateAvailable: (callback: (info: { version: string }) => void) => {
+    ipcRenderer.on('update-available', (_event, info) => callback(info));
+  },
+  onUpdateNotAvailable: (callback: () => void) => {
+    ipcRenderer.on('update-not-available', () => callback());
+  },
+  onUpdateDownloadProgress: (callback: (progress: { percent: number; transferred: number; total: number }) => void) => {
+    ipcRenderer.on('update-download-progress', (_event, progress) => callback(progress));
+  },
+  onUpdateDownloaded: (callback: (info: { version: string }) => void) => {
+    ipcRenderer.on('update-downloaded', (_event, info) => callback(info));
+  },
+  onUpdateError: (callback: (err: { message: string }) => void) => {
+    ipcRenderer.on('update-error', (_event, err) => callback(err));
+  },
+  installUpdate: (): Promise<void> =>
+    ipcRenderer.invoke('install-update'),
+  removeUpdateListeners: () => {
+    ipcRenderer.removeAllListeners('update-available');
+    ipcRenderer.removeAllListeners('update-not-available');
+    ipcRenderer.removeAllListeners('update-download-progress');
+    ipcRenderer.removeAllListeners('update-downloaded');
+    ipcRenderer.removeAllListeners('update-error');
+  },
 });

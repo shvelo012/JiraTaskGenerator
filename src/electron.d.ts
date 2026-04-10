@@ -42,6 +42,15 @@ declare global {
       getHistory: () => Promise<{ success: true; entries: HistoryEntry[] } | { success: false; error: string }>;
       saveHistoryEntry: (entry: HistoryEntry) => Promise<{ success: boolean; error?: string }>;
       deleteHistoryEntry: (id: string) => Promise<{ success: boolean; error?: string }>;
+
+      // Auto-updater
+      onUpdateAvailable: (callback: (info: { version: string }) => void) => void;
+      onUpdateNotAvailable: (callback: () => void) => void;
+      onUpdateDownloadProgress: (callback: (progress: { percent: number; transferred: number; total: number }) => void) => void;
+      onUpdateDownloaded: (callback: (info: { version: string }) => void) => void;
+      onUpdateError: (callback: (err: { message: string }) => void) => void;
+      installUpdate: () => Promise<void>;
+      removeUpdateListeners: () => void;
     };
   }
 }

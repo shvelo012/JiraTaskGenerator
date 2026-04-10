@@ -20,7 +20,10 @@
     "dist": "npm run build && electron-builder",
     "dist:linux": "npm run build && electron-builder --linux",
     "dist:win": "npm run build && electron-builder --win",
-    "dist:mac": "npm run build && electron-builder --mac"
+    "dist:mac": "npm run build && electron-builder --mac",
+    "publish:linux": "npm run build && electron-builder --linux --publish always",
+    "publish:win": "npm run build && electron-builder --win --publish always",
+    "publish:mac": "npm run build && electron-builder --mac --publish always"
   },
   "build": {
     "appId": "com.jirataskconverter.app",
@@ -58,11 +61,17 @@
       "target": [
         "dmg"
       ]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "saba30",
+      "repo": "JiraTaksConverter"
     }
   },
   "dependencies": {
     "axios": "^1.7.2",
     "electron-store": "^8.2.0",
+    "electron-updater": "^6.8.3",
     "form-data": "^4.0.5",
     "mammoth": "^1.8.0",
     "node-llama-cpp": "^3.18.1",

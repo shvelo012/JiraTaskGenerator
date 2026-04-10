@@ -123,3 +123,10 @@ export interface SaveSettingsFailure {
 }
 
 export type SaveSettingsResult = SaveSettingsSuccess | SaveSettingsFailure;
+
+export type UpdateStatus =
+  | { state: 'idle' }
+  | { state: 'available'; version: string }
+  | { state: 'downloading'; percent: number }
+  | { state: 'ready'; version: string }
+  | { state: 'error'; message: string };

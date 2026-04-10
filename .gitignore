@@ -19,9 +19,10 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Editor
+# Editor & AI tools
 .vscode/
 .idea/
+.claude/
 
 # Environment
 .env

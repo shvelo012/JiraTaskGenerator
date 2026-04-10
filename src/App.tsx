@@ -3,7 +3,7 @@ import FileUpload from './components/FileUpload';
 import TaskList from './components/TaskList';
 import Settings from './components/Settings';
 import HistoryPanel from './components/HistoryPanel';
-import type { JiraTask, TaskCreationResult, HistoryEntry } from './types';
+import type { JiraTask, TaskCreationResult, HistoryEntry, UpdateStatus } from './types';
 
 interface Step {
   id: string;
@@ -72,6 +72,26 @@ export default function App() {
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [selectedHistoryEntry, setSelectedHistoryEntry] = useState<HistoryEntry | null>(null);
   const [sessionRestored, setSessionRestored] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: 'idle' });
+
+  // ── Auto-updater listeners ────────────────────────────────────────────────
+  useEffect(() => {
+    window.electronAPI.onUpdateAvailable((info) => {
+      setUpdateStatus({ state: 'available', version: info.version });
+    });
+    window.electronAPI.onUpdateDownloadProgress((progress) => {
+      setUpdateStatus({ state: 'downloading', percent: progress.percent });
+    });
+    window.electronAPI.onUpdateDownloaded((info) => {
+      setUpdateStatus({ state: 'ready', version: info.version });
+    });
+    window.electronAPI.onUpdateError((err) => {
+      setUpdateStatus({ state: 'error', message: err.message });
+    });
+    return () => {
+      window.electronAPI.removeUpdateListeners();
+    };
+  }, []);
 
   // ── Restore session + load history on mount ──────────────────────────────
   useEffect(() => {
@@ -256,8 +276,54 @@ export default function App() {
       ? stepHeaders.history
       : (stepHeaders[activeStep] ?? stepHeaders.upload);
 
+  const updateBanner = () => {
+    if (updateStatus.state === 'available') {
+      return (
+        <div className="update-banner update-banner--available">
+          <span>Update v{updateStatus.version} available — downloading…</span>
+        </div>
+      );
+    }
+    if (updateStatus.state === 'downloading') {
+      return (
+        <div className="update-banner update-banner--downloading">
+          <span>Downloading update… {updateStatus.percent}%</span>
+          <div className="update-progress-bar">
+            <div className="update-progress-fill" style={{ width: `${updateStatus.percent}%` }} />
+          </div>
+        </div>
+      );
+    }
+    if (updateStatus.state === 'ready') {
+      return (
+        <div className="update-banner update-banner--ready">
+          <span>Update v{updateStatus.version} ready to install.</span>
+          <button className="update-install-btn" onClick={() => window.electronAPI.installUpdate()}>
+            Restart &amp; Install
+          </button>
+          <button className="update-dismiss-btn" onClick={() => setUpdateStatus({ state: 'idle' })}>
+            Later
+          </button>
+        </div>
+      );
+    }
+    if (updateStatus.state === 'error') {
+      return (
+        <div className="update-banner update-banner--error">
+          <span>Update check failed: {updateStatus.message}</span>
+          <button className="update-dismiss-btn" onClick={() => setUpdateStatus({ state: 'idle' })}>
+            Dismiss
+          </button>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
-    <div className="app-layout">
+    <div className="app-root">
+      {updateBanner()}
+      <div className="app-layout">
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-header">
@@ -553,6 +619,7 @@ export default function App() {
           )}
         </div>
       </main>
+      </div>
     </div>
   );
 }

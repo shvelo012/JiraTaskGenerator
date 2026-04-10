@@ -1,9 +1,39 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
+import { autoUpdater } from 'electron-updater';
 import { registerIpcHandlers } from './electron/ipc-handlers';
 import { unloadModel } from './electron/llm-manager';
 
 let mainWindow: BrowserWindow | null = null;
+
+function setupAutoUpdater(): void {
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-available', (info) => {
+    mainWindow?.webContents.send('update-available', { version: info.version });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    mainWindow?.webContents.send('update-not-available');
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    mainWindow?.webContents.send('update-download-progress', {
+      percent: Math.floor(progress.percent),
+      transferred: progress.transferred,
+      total: progress.total,
+    });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    mainWindow?.webContents.send('update-downloaded', { version: info.version });
+  });
+
+  autoUpdater.on('error', (err) => {
+    mainWindow?.webContents.send('update-error', { message: err.message });
+  });
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -37,11 +67,19 @@ app.whenReady().then(() => {
   registerIpcHandlers(ipcMain, () => mainWindow);
   createWindow();
 
+  setupAutoUpdater();
+  // Check for updates 3 seconds after startup to let the window load first
+  setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 3000);
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
   });
+});
+
+ipcMain.handle('install-update', () => {
+  autoUpdater.quitAndInstall();
 });
 
 app.on('window-all-closed', () => {
