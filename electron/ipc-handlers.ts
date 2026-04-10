@@ -5,6 +5,7 @@ import * as mammoth from 'mammoth';
 import axios, { AxiosError } from 'axios';
 import FormData from 'form-data';
 import Store from 'electron-store';
+import { app } from 'electron';
 import type { IpcMain, BrowserWindow } from 'electron';
 import type { AppSettings, JiraTask, CurrentSession, HistoryEntry } from '../src/types';
 import {
@@ -23,8 +24,10 @@ interface DataStoreSchema {
   sessionHistory: HistoryEntry[];
 }
 
+const isDev = !app.isPackaged;
+
 const store = new Store<StoreSchema>({
-  name: 'jira-task-converter-settings',
+  name: isDev ? 'jira-task-converter-settings-dev' : 'jira-task-converter-settings',
   defaults: {
     jiraBaseUrl: '',
     jiraEmail: '',
@@ -36,7 +39,7 @@ const store = new Store<StoreSchema>({
 });
 
 const dataStore = new Store<DataStoreSchema>({
-  name: 'jira-task-converter-data',
+  name: isDev ? 'jira-task-converter-data-dev' : 'jira-task-converter-data',
   defaults: {
     currentSession: null,
     sessionHistory: [],
