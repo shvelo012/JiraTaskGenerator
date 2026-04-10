@@ -1,6 +1,6 @@
 {
   "name": "jira-task-converter",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Convert DOCX documents to Jira tasks using local AI",
   "homepage": "https://github.com/shvelo012/JiraTaskGenerator",
   "author": {
@@ -65,7 +65,8 @@
     "publish": {
       "provider": "github",
       "owner": "shvelo012",
-      "repo": "JiraTaskGenerator"
+      "repo": "JiraTaskGenerator",
+      "releaseType": "release"
     }
   },
   "dependencies": {
